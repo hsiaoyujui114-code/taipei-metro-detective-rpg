@@ -32,12 +32,17 @@
 
 ---
 
-## 📂 專案文檔目錄
+## 📂 專案文檔目錄 (AI 協作專用分類文檔庫)
 
-- [🤖 `AI_HANDOVER.md`](./AI_HANDOVER.md) - 給接續 AI 的交接總綱與規範手冊
-- [📋 `PROJECT_SPEC.md`](./PROJECT_SPEC.md) - 完整功能規格書、捷運站點與數值設定
-- [📜 `DISCUSSION_LOG.md`](./DISCUSSION_LOG.md) - 使用者歷次討論、反饋與修改決策紀錄
-- [🎨 `ART_STYLE_GUIDE.md`](./ART_STYLE_GUIDE.md) - 雲端硬碟 41 張概念圖風格解析手冊
+完整文檔已統一整理於 [`docs/`](./docs/README.md) 資料夾中並進行結構化分類：
+
+| 分類項目 | 文件路徑 | 重點說明 |
+| :--- | :--- | :--- |
+| **導航總覽** | [📚 `docs/README.md`](./docs/README.md) | AI 協作文檔導航中樞與推薦閱讀順序 |
+| **01. AI 交接** | [🤖 `docs/01_ai_handover/AI_HANDOVER.md`](./docs/01_ai_handover/AI_HANDOVER.md) | **【最重要】** 核心痛點、雙引擎切換、設計誡命與工作流 |
+| **02. 系統規格** | [📋 `docs/02_project_spec/PROJECT_SPEC.md`](./docs/02_project_spec/PROJECT_SPEC.md) | 遊戲循環、數值體系、捷運站點配置、道具規格 |
+| **03. 討論紀錄** | [📜 `docs/03_discussion_history/DISCUSSION_LOG.md`](./docs/03_discussion_history/DISCUSSION_LOG.md) | 第 1 ~ 5 回合所有使用者對話、需求與修改決策 |
+| **04. 美術情境** | [🎨 `docs/04_art_and_style/ART_STYLE_GUIDE.md`](./docs/04_art_and_style/ART_STYLE_GUIDE.md) | 雲端 41 張概念圖分析、視覺基調（非彈窗貼圖） |
 
 ---
 
