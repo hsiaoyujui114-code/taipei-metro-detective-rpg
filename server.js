@@ -64,6 +64,20 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // 50 宗歷史風情與生活科學案件全集展示支援
+  if (reqPath === '/cases' || reqPath === '/cases/' || reqPath === '/cases.html') {
+    const candidatePaths = [
+      path.join(__dirname, 'cases.html'),
+      path.join(__dirname, '../taipei-detective-core/public/cases.html')
+    ];
+    const targetHtml = candidatePaths.find(p => fs.existsSync(p));
+    if (targetHtml) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(targetHtml).pipe(res);
+      return;
+    }
+  }
+
   // 偵探核心 REST API 路由 (直接掛載 taipei-detective-core 統一路由器，達成 100% 雙向無縫無斷點)
   if (reqPath.startsWith('/api/detective/') && detectiveEngine) {
     try {
