@@ -1098,6 +1098,10 @@ class TransitLiveService {
           const u = Math.max(0.02, Math.min(0.98, (nowSec - sA.depSec) / span));
           const lat = sA.coords.lat + (sB.coords.lat - sA.coords.lat) * u;
           const lon = sA.coords.lon + (sB.coords.lon - sA.coords.lon) * u;
+
+          // ★ 企劃書出入境核心規則：南下列車一旦往南駛過鶯歌南端邊界 (lat < 24.945)，即離境出城，在地圖上消失看不到了！
+          if (lat < 24.945) return;
+
           const distKm = calcDistKm(sA.coords.lat, sA.coords.lon, sB.coords.lat, sB.coords.lon);
           const avgSpeed = Math.min(125, Math.max(45, Math.round((distKm / (span / 3600)))));
 
@@ -1259,6 +1263,17 @@ class TransitLiveService {
         if (nowSec > stA.depSec && nowSec < stB.arrSec) {
           const span = Math.max(60, stB.arrSec - stA.depSec);
           const u = (nowSec - stA.depSec) / span;
+
+          // ★ 企劃書出入境核心規則：南下列車一旦跨過新北邊界即離境消失，北上班次自南端入境出現
+          if (stA.id === '1010' && stB.id === '1020') {
+            // 南下列車 (板橋 ➔ 桃園方向)：超過新北西南邊界 (u > 0.42) 即離境出城，在地圖上消失看不到了！
+            if (u > 0.42) return;
+          }
+          if (stA.id === '1020' && stB.id === '1010') {
+            // 北上班次 (桃園 ➔ 板橋方向)：尚未跨進新北西南邊界 (u < 0.58) 尚未入境，不顯示！
+            if (u < 0.58) return;
+          }
+
           const pt = interpolateCorridorSegment(THSR_CORRIDOR_PTS, stA.corridorIdx, stB.corridorIdx, u);
           const isSouthOfBanqiao = (stA.id === '1010' || stB.id === '1020');
           const topSpeed = isSouthOfBanqiao ? 285 : 145;
