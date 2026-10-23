@@ -51,10 +51,15 @@ const server = http.createServer((req, res) => {
 
   // 獨立都會調查員偵探測試工作台與伺服器版本支援
   if (reqPath === '/detective' || reqPath === '/detective/') {
-    const detectiveHtml = path.join(__dirname, '../taipei-detective-core/public/index.html');
-    if (fs.existsSync(detectiveHtml)) {
+    const candidatePaths = [
+      path.join(__dirname, '../taipei-detective-core/public/index.html'),
+      path.join(__dirname, 'detective.html'),
+      path.join(__dirname, 'public/detective.html')
+    ];
+    const targetHtml = candidatePaths.find(p => fs.existsSync(p));
+    if (targetHtml) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      fs.createReadStream(detectiveHtml).pipe(res);
+      fs.createReadStream(targetHtml).pipe(res);
       return;
     }
   }
