@@ -17,15 +17,15 @@ const { WebSocketServer, WebSocket } = require('ws');
 const transitLiveService = require('./transit-live-service');
 
 // 載入獨立都會調查員偵探核心引擎 (落實伺服器版本雙軌並行)
-const CORE_REPO_DIR = path.join(__dirname, '../taipei-detective-core');
+const CORE_REPO_DIR = process.env.CORE_REPO_DIR || path.join(__dirname, '../taipei-detective-core');
 let detectiveEngine = null;
 if (!fs.existsSync(CORE_REPO_DIR)) {
-  console.warn('⚠️ [ISSUE-08 前置檢查] 未偵測到兄弟倉庫 ../taipei-detective-core');
-  console.warn('   /detective 與 /api/detective/* 需與 taipei-detective-core 並排置於同一父目錄：');
+  console.warn('⚠️ [ISSUE-08 前置檢查] 未偵測到兄弟倉庫 ' + CORE_REPO_DIR);
+  console.warn('   /detective 與 /api/detective/* 需與 taipei-detective-core 並排置於同一父目錄（或設定 CORE_REPO_DIR 環境變數）：');
   console.warn('   cd .. && git clone https://github.com/hsiaoyujui114-code/taipei-detective-core.git');
 } else {
   try {
-    const detectiveModule = require('../taipei-detective-core/src/index');
+    const detectiveModule = require(path.join(CORE_REPO_DIR, 'src/index'));
     detectiveEngine = detectiveModule.createDetectiveEngine();
   } catch (e) {
     console.warn('⚠️ Detective core module not loaded in server:', e.message);
@@ -58,15 +58,10 @@ const server = http.createServer((req, res) => {
 
   // 獨立都會調查員偵探測試工作台與伺服器版本支援
   if (reqPath === '/detective' || reqPath === '/detective/') {
-    const candidatePaths = [
-      path.join(__dirname, '../taipei-detective-core/public/index.html'),
-      path.join(__dirname, 'detective.html'),
-      path.join(__dirname, 'public/detective.html')
-    ];
-    const targetHtml = candidatePaths.find(p => fs.existsSync(p));
-    if (targetHtml) {
+    const detectiveHtml = path.join(CORE_REPO_DIR, 'public/index.html');
+    if (fs.existsSync(detectiveHtml)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      fs.createReadStream(targetHtml).pipe(res);
+      fs.createReadStream(detectiveHtml).pipe(res);
       return;
     }
     res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -76,19 +71,15 @@ const server = http.createServer((req, res) => {
 
   // 50 宗歷史風情與生活科學案件全集展示支援
   if (reqPath === '/cases' || reqPath === '/cases/' || reqPath === '/cases.html') {
-    const candidatePaths = [
-      path.join(__dirname, 'cases.html'),
-      path.join(__dirname, '../taipei-detective-core/public/cases.html')
-    ];
-    const targetHtml = candidatePaths.find(p => fs.existsSync(p));
-    if (targetHtml) {
+    const casesHtml = path.join(__dirname, 'cases.html');
+    if (fs.existsSync(casesHtml)) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      fs.createReadStream(targetHtml).pipe(res);
+      fs.createReadStream(casesHtml).pipe(res);
       return;
     }
   }
 
-  // 偵探核心 REST API 路由 (直接掛載 taipei-detective-core 統一路由器，達成 100% 雙向無縫無斷點)
+  // 偵探核心 REST API 路由
   if (reqPath.startsWith('/api/detective/')) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -101,11 +92,136 @@ const server = http.createServer((req, res) => {
       }));
       return;
     }
-    try {
-      const { handleDetectiveRequest } = require('../taipei-detective-core/server');
-      return handleDetectiveRequest(req, res, detectiveEngine);
-    } catch (err) {
-      console.error('Error forwarding to detective core handler:', err);
+
+    function parseBody(request) {
+      return new Promise((resolve) => {
+        let b = '';
+        request.on('data', c => { b += c; });
+        request.on('end', () => {
+          try { resolve(b ? JSON.parse(b) : {}); } catch (err) { resolve({}); }
+        });
+      });
+    }
+
+    if (reqPath === '/api/detective/status' && req.method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: true,
+        investigator: detectiveEngine.investigator.getStatus(),
+        inventory: detectiveEngine.investigator.inventory.listAll(),
+        activeCase: detectiveEngine.caseManager.getActiveCaseState()
+      }));
+      return;
+    }
+
+    if (reqPath === '/api/detective/cases' && req.method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: true,
+        cases: detectiveEngine.loader.listCases()
+      }));
+      return;
+    }
+
+    if (reqPath === '/api/detective/case/accept' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.caseManager.acceptCase(body.caseId, detectiveEngine.investigator);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/evidence/examine' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.evidenceEngine.examineEvidence(body.evidenceId, body.toolId, detectiveEngine.investigator);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/dialogue/start' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.dialogueEngine.startDialogue(body.sessionId || 'session_web', body.npcId);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/dialogue/select' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.dialogueEngine.selectOption(body.sessionId || 'session_web', body.optionIndex, detectiveEngine.investigator);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/deduction/solve' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.caseManager.resolveCase(body.caseId, body.suspectId, body.evidenceIds || [], detectiveEngine.investigator);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/bridge/events' && req.method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: true,
+        events: detectiveEngine.bridge.getRecentEvents(30)
+      }));
+      return;
+    }
+
+    if (reqPath === '/api/detective/bridge/event' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const entry = detectiveEngine.bridge.dispatch(body.event, body.payload);
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true, dispatched: entry }));
+      });
+      return;
+    }
+
+    // ─── 地圖搭配專屬端點 (Map Pairing APIs) ───
+    if (reqPath === '/api/detective/map/pairing-status' && req.method === 'GET') {
+      const caseId = urlObj.searchParams.get('caseId');
+      res.writeHead(200);
+      res.end(JSON.stringify(detectiveEngine.mapCoordinator.getCaseMapOverlays(caseId)));
+      return;
+    }
+
+    if (reqPath === '/api/detective/map/geojson' && req.method === 'GET') {
+      const caseId = urlObj.searchParams.get('caseId');
+      res.writeHead(200);
+      res.end(JSON.stringify(detectiveEngine.mapCoordinator.exportGeoJson(caseId)));
+      return;
+    }
+
+    if (reqPath === '/api/detective/map/sync-location' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const coords = body.coords || [body.lat, body.lon];
+        const result = detectiveEngine.mapCoordinator.syncLocationFromMap(
+          coords,
+          body.locationName || '雙北街區',
+          body.isWalk !== false
+        );
+        res.writeHead(result.success ? 200 : (result.isForbidden ? 403 : 400));
+        res.end(JSON.stringify(result));
+      });
+      return;
+    }
+
+    if (reqPath === '/api/detective/map/mode' && req.method === 'POST') {
+      parseBody(req).then(body => {
+        const result = detectiveEngine.mapCoordinator.setPairingMode(body.mode);
+        res.writeHead(result.success ? 200 : 400);
+        res.end(JSON.stringify(result));
+      });
+      return;
     }
   }
 
